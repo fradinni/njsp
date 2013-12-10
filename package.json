@@ -1,0 +1,21 @@
+{
+  "name": "njsp",
+  "version": "0.1.0",
+  "description": "NodeJS Project Creator",
+  "author": "Nicolas FRADIN",
+  "main": "njsp.js",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "bugs": {
+    "url": ""
+  },
+  "scripts": {
+    "start": "node njsp.js"
+  },
+  "engines": {},
+  "dependencies": {
+    "optimist": "~0.6.0"
+  }
+}
