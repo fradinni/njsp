@@ -8,7 +8,9 @@
     "type": "git",
     "url": ""
   },
-  "bin" : { "npm" : "./njsp.js" }
+  "bin" : {
+    "njsp" : "./njsp.js"
+  },
   "bugs": {
     "url": ""
   },
