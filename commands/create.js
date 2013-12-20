@@ -78,7 +78,7 @@ CreateCommand.prototype.execute = function() {
         function (callback) {
           // If MongoHQ database should be created
           if(mongohq) {
-            self.createMongoHQDatabase(self.config.get('mongohq_key'), projectName, function () {
+            self.createMongoHQDatabase(self.config.get('mongohq_key'), projectName, projectFullPath, heroku, function (err) {
               callback(null);
             });
           } else {
@@ -126,7 +126,7 @@ CreateCommand.prototype.updatePackageJson = function (projectPath, appName, git)
   var packageJson = JSON.parse(fs.readFileSync(filePath));
   packageJson.name = appName;
   packageJson.author = 'Your name';
-  packageJson.repository.url = git && this.args.git.length ? this.args.git : '';
+  packageJson.repository.url = git && this.args.git ? this.args.git : '';
   packageJson.bugs.url = '';
 
   // Save package.json
@@ -202,11 +202,26 @@ CreateCommand.prototype.createHerokuApp = function (apiKey, appName, projectPath
 
   request.post(options, function (error, response, body) {
     if (!error && body) {
+
+      // If a parameter was invalid
+      if(body.id && body.id === 'invalid_params') {
+        return console.log('\033[31mError: '+body.message+'\033[30m');
+      }
+
+      // Display heroku app infos
       console.log('ID: '+body.id);
       console.log('URL: '+body.web_url);
       console.log('GIT: '+body.git_url);
       console.log('\033[32mHeroku app created: '+body.name+'\033[30m');
 
+      // Generate local .env file
+      console.log('Creating Heroku local .env file...');
+      var envContent = '';
+      envContent += 'SERVER=http://localhost\n';
+      envContent += 'PORT=5000\n';
+      fs.writeFileSync(path.normalize(projectPath+'/.env'), envContent);
+
+      // Add heroku remote git origin
       var herokuremoteadd = spawn('heroku', [ 'git:remote', '-a', appName ], {cwd: projectPath});
       herokuremoteadd.stderr.on('data', function (data) {
         error = true;
@@ -232,7 +247,7 @@ CreateCommand.prototype.createHerokuApp = function (apiKey, appName, projectPath
 /**
 *
 */
-CreateCommand.prototype.createMongoHQDatabase = function (apiKey, appName, callback) {
+CreateCommand.prototype.createMongoHQDatabase = function (apiKey, appName, projectPath, heroku, callback) {
   console.log('Create MongoHQ database...');
   var options = {
     url: 'https://api.mongohq.com/databases?_apikey=' + this.config.get('mongohq_key'),
@@ -247,13 +262,30 @@ CreateCommand.prototype.createMongoHQDatabase = function (apiKey, appName, callb
 
   request.post(options, function (error, response, body) {
     if (!error && body) {
-      console.log(body);
-      callback(null);
+      options = {
+        url: 'https://api.mongohq.com/databases/'+appName+'?_apikey=' + this.config.get('mongohq_key'),
+        headers: {
+          'User-Agent': 'NodeJS'
+        }
+      };
+      request.get(options, function(error, response, body) {
+        if(!error && body) {
+          var data = JSON.parse(body);
+          var mongoUrl = 'mongodb://<user>:<password>@' + data.hostname + ':' + data.port + '/' + data.db;
+          console.log('MONGOHQ_URL: ' + 'mongodb://<user>:<password>@' + data.hostname + ':' + data.port + '/' + data.db);
+          if(heroku) {
+            fs.appendFileSync(path.normalize(projectPath+'/.env'), 'MONGOHQ_URL='+mongoUrl);
+          }
+          callback(null);
+        } else {
+          callback(true);
+        }
+      }.bind(this));
     } else {
       console.log('\033[31mError: Unable to create MongoHQ database !\033[30m');
       callback(true);
     }
-  });
+  }.bind(this));
 };
 
 
